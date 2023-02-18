@@ -33,11 +33,8 @@ const deleteById = async (req, res) => {
 
 const updatebyId = async (req, res) => {
   const { id } = req.params;
-  const getResult = await contactsActions.getContactById(id);
-  const putResult = await contactsActions.updateContact(id, {
-    ...getResult,
-    ...req.body,
-  });
+  // const getResult = await contactsActions.getContactById(id);
+  const putResult = await contactsActions.updateContact(id, req.body);
   if (!putResult) {
     throw HttpError(404, "Not found");
   }
