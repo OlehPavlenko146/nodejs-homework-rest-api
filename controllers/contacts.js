@@ -5,31 +5,16 @@ const { HttpError, ctrlWrapper } = require("../helpers");
 const getAll = async (req, res) => {
   const { _id: owner } = req.user;
 
-  const {
-    page = 1,
-    limit = 20,
-    favorite = null,
-    name = null,
-    email = null,
-  } = req.query;
+  const { page = 1, limit = 20 } = req.query;
+
+  const filters = { owner, ...req.query };
 
   const skip = (page - 1) * limit;
-  let result;
-  if (favorite || name || email) {
-    result = await Contact.find(
-      { owner, $and: [{ $or: [{ favorite }, { name }, { email }] }] },
-      "-createdAt -updatedAt",
-      {
-        skip,
-        limit,
-      }
-    ).populate("owner", "email subscription");
-  } else {
-    result = await Contact.find({ owner }, "-createdAt -updatedAt", {
-      skip,
-      limit,
-    }).populate("owner", "email subscription");
-  }
+
+  result = await Contact.find(filters, "-createdAt -updatedAt", {
+    skip,
+    limit,
+  }).populate("owner", "email subscription");
 
   return res.status(200).json(result);
 };
