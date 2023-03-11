@@ -1,5 +1,10 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const gravatar = require("gravatar");
+const path = require("path");
+const fs = require("fs/promises");
+const Jimp = require("jimp");
+
 require("dotenv").config();
 
 const { User } = require("../models/user");
@@ -7,6 +12,8 @@ const { User } = require("../models/user");
 const { HttpError, ctrlWrapper } = require("../helpers");
 
 const { SECRET_KEY } = process.env;
+
+const avatarsDir = path.join(__dirname, "../", "public", "avatars");
 
 const signupUser = async (req, res) => {
   const { email, password, subscription = "starter" } = req.body;
@@ -17,8 +24,9 @@ const signupUser = async (req, res) => {
   }
 
   const hashPassword = await bcrypt.hash(password, 10);
+  const avatarURL = gravatar.url(email);
 
-  await User.create({ ...req.body, password: hashPassword });
+  await User.create({ ...req.body, password: hashPassword, avatarURL });
   return res.status(201).json({
     user: {
       email,
@@ -83,7 +91,34 @@ const updateSubscription = async (req, res) => {
   res.status(200).json({ result });
 };
 
-module.exports = updateSubscription;
+const updateAvatar = async (req, res) => {
+  if (!req.file) {
+    throw HttpError(400, "Please, upload file for avatar");
+  }
+  const { _id } = req.user;
+  const { path: tempUpload, originalname, mimetype } = req.file;
+  const fileName = `${_id}_${originalname}`;
+
+  if (mimetype !== "image/jpeg") {
+    await fs.unlink(tempUpload);
+    throw HttpError(
+      406,
+      "Wrong image extansion. It needs image with .jpeg or .jpg extension"
+    );
+  }
+  const resultUpload = path.join(avatarsDir, fileName);
+  Jimp.read(tempUpload, (err, avatar) => {
+    if (err) {
+      throw err;
+    }
+    avatar.resize(250, 250).quality(60).write(resultUpload);
+  });
+  await fs.rename(tempUpload, resultUpload);
+  const avatarURL = path.join("avatars", fileName);
+  await User.findByIdAndUpdate(_id, { avatarURL });
+
+  res.status(200).json({ avatarURL });
+};
 
 module.exports = {
   signupUser: ctrlWrapper(signupUser),
@@ -91,4 +126,5 @@ module.exports = {
   getCurrent: ctrlWrapper(getCurrent),
   logout: ctrlWrapper(logout),
   updateSubscription: ctrlWrapper(updateSubscription),
+  updateAvatar: ctrlWrapper(updateAvatar),
 };
